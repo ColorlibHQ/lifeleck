@@ -118,9 +118,7 @@
 	// Customizer
 	require_once( LIFELECK_DIR_PATH_INC . 'customizer/customizer.php' );
 	// Class autoloader
-	require_once( LIFELECK_DIR_PATH_INC . 'class-epsilon-dashboard-autoloader.php' );
 	// Class lifeleck dashboard
-	require_once( LIFELECK_DIR_PATH_INC . 'class-epsilon-init-dashboard.php' );
 	
 
 	// Admin Enqueue Script
@@ -205,3 +203,11 @@ if ( ! function_exists( 'lifeleck_modern_supports' ) ) {
 	}
 	add_action( 'after_setup_theme', 'lifeleck_modern_supports', 20 );
 }
+
+/**
+ * The theme's Customizer controls.
+ *
+ * Replaces the Epsilon framework: same fields and stored values,
+ * built on core's Customizer API.
+ */
+require_once get_template_directory() . '/inc/customizer/colorlib-customizer/colorlib-customizer.php';
