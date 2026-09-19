@@ -229,7 +229,7 @@ function lifeleck_page_titlebar() {
             <div class="container">
 				<div class="row align-items-center justify-content-between">
 					<div class="col-sm-6">
-						<div class="breadcrumb_tittle text-left">
+						<div class="breadcrumb_tittle text-start">
 							<h2>
 								<?php
 								if ( is_category() ) {
@@ -262,7 +262,7 @@ function lifeleck_page_titlebar() {
 						</div>
 					</div>
 					<div class="col-sm-6">
-						<div class="breadcrumb_content text-right">
+						<div class="breadcrumb_content text-end">
 							<?php
 							if ( function_exists( 'lifeleck_breadcrumbs' ) ) {
 								lifeleck_breadcrumbs();
