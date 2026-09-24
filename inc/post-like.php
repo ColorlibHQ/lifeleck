@@ -14,6 +14,7 @@ function lifeleck_sl_enqueue_scripts() {
 
 	wp_localize_script( 'lifeleck-post-likes', 'simpleLikes', array(
 		'ajaxurl' => admin_url( 'admin-ajax.php' ),
+		'like'    => esc_html__( 'Like', 'lifeleck' ),
 		'unlike'  => esc_html__( 'Unlike', 'lifeleck' )
 	) );
 }
