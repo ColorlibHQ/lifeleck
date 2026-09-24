@@ -1,21 +1,26 @@
-(function ($) {
-  "use strict";
+/**
+ * Lifeleck front-end behaviour, without jQuery: the header that fixes itself
+ * on scroll, and styled selects (Nice Select markup, from ColorlibUI).
+ */
+(function () {
+  'use strict';
+
+  var UI = window.ColorlibUI;
+  if (!UI) return;
+
   // menu fixed js code
-  $(window).scroll(function () {
-    var window_top = $(window).scrollTop() + 1;
-    if (window_top > 50) {
-      $('.main_menu').addClass('menu_fixed animated fadeInDown');
-    } else {
-      $('.main_menu').removeClass('menu_fixed animated fadeInDown');
+  window.addEventListener('scroll', function () {
+    var fixed = window.pageYOffset + 1 > 50;
+    UI.toElements('.main_menu').forEach(function (menu) {
+      menu.classList.toggle('menu_fixed', fixed);
+      menu.classList.toggle('animated', fixed);
+      menu.classList.toggle('fadeInDown', fixed);
+    });
+  }, { passive: true });
+
+  UI.ready(function () {
+    if (document.getElementById('default-select')) {
+      UI.enhanceSelects('select');
     }
   });
-  
-  if (document.getElementById('default-select')) {
-		ColorlibUI.enhanceSelects('select');
-  }
-
-  
-
-
-  
-}(jQuery));
+}());

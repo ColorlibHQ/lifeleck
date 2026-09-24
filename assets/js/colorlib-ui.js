@@ -1,9 +1,12 @@
+/*! ColorlibUI 3.0.0 — core, ajaxchimp. Built for this theme from core + the modules it uses. */
 /**
  * The interactive pieces these themes actually use, without jQuery.
  *
- * It replaces Owl Carousel, Slick, Magnific Popup, jQuery Nice Select,
- * CounterUp with the Waypoints library it needed, and WOW.js, which together
- * weigh about 40KB gzipped before jQuery itself is counted.
+ * The core: the small helpers every module uses, plus the pieces nearly every
+ * theme needs (styled selects, counters, reveal on scroll). Modules for the
+ * other plugins the themes used (Owl Carousel, Slick, Magnific Popup, Isotope,
+ * SlickNav, ScrollUp, AjaxChimp, ...) are appended after it by the build, only
+ * when a theme uses them, and register themselves on window.ColorlibUI.
  * Those libraries are general-purpose; the themes use a narrow slice of them:
  * a looping carousel, a slider with a thumbnail strip, a lightbox for images
  * and video embeds, a styled select, numbers that count up and elements that
@@ -21,242 +24,146 @@
     ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
     : false;
 
-  /* ------------------------------------------------------------------ *
-   * Carousel
-   *
-   * One track, any number of slides, optional dots, arrows and autoplay.
-   * Slides are moved with a transform on the track, so there is no layout
-   * work per frame.
-   * ------------------------------------------------------------------ */
-
-  function Carousel(root, options) {
-    var opts = Object.assign(
-      { perView: 1, loop: true, autoplay: 0, dots: false, arrows: false, gap: 0 },
-      options || {}
-    );
-
-    var slides = Array.prototype.slice.call(root.children);
-    if (slides.length === 0) return null;
-
-    var viewport = document.createElement('div');
-    var track = document.createElement('div');
-    viewport.className = 'cl-carousel__viewport';
-    track.className = 'cl-carousel__track';
-
-    root.classList.add('cl-carousel');
-    slides.forEach(function (slide) {
-      slide.classList.add('cl-carousel__slide');
-      track.appendChild(slide);
-    });
-    viewport.appendChild(track);
-    root.appendChild(viewport);
-
-    var index = 0;
-    var timer = null;
-    var dotsWrap = null;
-
-    function perView() {
-      // A number, or a map of minimum widths to a number.
-      if (typeof opts.perView === 'number') return opts.perView;
-      var width = window.innerWidth;
-      var best = 1;
-      Object.keys(opts.perView)
-        .map(Number)
-        .sort(function (a, b) { return a - b; })
-        .forEach(function (bp) {
-          if (width >= bp) best = opts.perView[bp];
-        });
-      return best;
+  /** Elements from a selector, an Element, a NodeList/array, or a jQuery-like object. */
+  function toElements(target, root) {
+    if (!target) return [];
+    if (typeof target === 'string') {
+      return Array.prototype.slice.call((root || document).querySelectorAll(target));
     }
+    if (target.nodeType === 1) return [target];
+    if (typeof target.length === 'number') return Array.prototype.slice.call(target);
+    return [];
+  }
 
-    function maxIndex() {
-      return Math.max(0, slides.length - perView());
+  /** Dispatch a bubbling CustomEvent carrying detail. */
+  function emit(el, type, detail) {
+    var event;
+    try {
+      event = new CustomEvent(type, { bubbles: true, cancelable: true, detail: detail || {} });
+    } catch (e) {
+      event = document.createEvent('CustomEvent');
+      event.initCustomEvent(type, true, true, detail || {});
     }
+    return el.dispatchEvent(event);
+  }
 
-    function layout() {
-      var n = perView();
-      var basis = 'calc(' + (100 / n) + '% - ' + (opts.gap * (n - 1) / n) + 'px)';
-      slides.forEach(function (slide) {
-        slide.style.flex = '0 0 ' + basis;
-        slide.style.maxWidth = basis;
-        slide.style.marginRight = opts.gap + 'px';
-      });
-      go(Math.min(index, maxIndex()), true);
-    }
-
-    function go(next, instant) {
-      var limit = maxIndex();
-      if (next < 0) next = opts.loop ? limit : 0;
-      if (next > limit) next = opts.loop ? 0 : limit;
-      index = next;
-
-      var slide = slides[0];
-      var step = slide.getBoundingClientRect().width + opts.gap;
-      track.style.transition = instant || PREFERS_REDUCED ? 'none' : 'transform .45s ease';
-      track.style.transform = 'translate3d(' + -(step * index) + 'px,0,0)';
-
-      if (dotsWrap) {
-        Array.prototype.forEach.call(dotsWrap.children, function (dot, i) {
-          dot.classList.toggle('is-active', i === index);
-          dot.setAttribute('aria-selected', i === index ? 'true' : 'false');
-        });
-      }
-      root.dispatchEvent(new CustomEvent('cl:change', { detail: { index: index } }));
-    }
-
-    if (opts.dots) {
-      dotsWrap = document.createElement('div');
-      dotsWrap.className = 'cl-carousel__dots';
-      dotsWrap.setAttribute('role', 'tablist');
-      slides.forEach(function (_, i) {
-        var dot = document.createElement('button');
-        dot.type = 'button';
-        dot.className = 'cl-carousel__dot';
-        dot.setAttribute('role', 'tab');
-        dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
-        dot.addEventListener('click', function () { go(i); restart(); });
-        dotsWrap.appendChild(dot);
-      });
-      root.appendChild(dotsWrap);
-    }
-
-    if (opts.arrows) {
-      ['prev', 'next'].forEach(function (dir) {
-        var button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'cl-carousel__arrow cl-carousel__arrow--' + dir;
-        button.setAttribute('aria-label', dir === 'prev' ? 'Previous slide' : 'Next slide');
-        button.innerHTML = dir === 'prev' ? '&#8249;' : '&#8250;';
-        button.addEventListener('click', function () {
-          go(index + (dir === 'next' ? 1 : -1));
-          restart();
-        });
-        root.appendChild(button);
-      });
-    }
-
-    function restart() {
-      if (timer) clearInterval(timer);
-      if (opts.autoplay > 0 && !PREFERS_REDUCED) {
-        timer = setInterval(function () { go(index + 1); }, opts.autoplay);
+  /** Shallow-merge plain objects left to right (Object.assign where available). */
+  function extend(target) {
+    for (var i = 1; i < arguments.length; i++) {
+      var src = arguments[i];
+      if (!src) continue;
+      for (var k in src) {
+        if (Object.prototype.hasOwnProperty.call(src, k)) target[k] = src[k];
       }
     }
+    return target;
+  }
 
-    // Pause while the pointer is over it, and while the tab is hidden.
-    root.addEventListener('mouseenter', function () { if (timer) clearInterval(timer); });
-    root.addEventListener('mouseleave', restart);
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) { if (timer) clearInterval(timer); } else { restart(); }
-    });
+  /** Parse an HTML string into its first element (for navText, prevArrow, ...). */
+  function fromHTML(html) {
+    var t = document.createElement('template');
+    t.innerHTML = String(html).trim();
+    return t.content.firstElementChild || document.createTextNode(String(html));
+  }
 
-    // Touch, so a phone can swipe.
-    var startX = null;
-    viewport.addEventListener('touchstart', function (e) { startX = e.touches[0].clientX; }, { passive: true });
-    viewport.addEventListener('touchend', function (e) {
-      if (startX === null) return;
-      var dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > 40) go(index + (dx < 0 ? 1 : -1));
-      startX = null;
-      restart();
-    }, { passive: true });
-
-    window.addEventListener('resize', debounce(layout, 150));
-
-    layout();
-    restart();
-
-    return { go: go, get index() { return index; }, length: slides.length, el: root };
+  /** Animate window scroll to y over ms (instant with reduced motion). */
+  function scrollToY(y, ms) {
+    if (PREFERS_REDUCED || !ms) { window.scrollTo(0, y); return; }
+    var from = window.pageYOffset, start = null;
+    function step(now) {
+      if (start === null) start = now;
+      var p = Math.min((now - start) / ms, 1);
+      var eased = p < 0.5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
+      window.scrollTo(0, from + (y - from) * eased);
+      if (p < 1) window.requestAnimationFrame(step);
+    }
+    window.requestAnimationFrame(step);
   }
 
   /* ------------------------------------------------------------------ *
-   * Lightbox
-   *
-   * Images and video embeds. Replaces Magnific Popup, which the themes use
-   * for exactly these two cases.
+   * The jQuery effects the themes use, on the Web Animations API.
+   * jQuery's semantics: slideDown/fadeIn show a hidden element (display
+   * from the stylesheet, or block), slideUp/fadeOut end with display:none.
+   * With reduced motion the end state is applied at once.
    * ------------------------------------------------------------------ */
 
-  function Lightbox() {
-    var overlay = null;
-    var group = [];
-    var at = 0;
-
-    function close() {
-      if (!overlay) return;
-      document.removeEventListener('keydown', onKey);
-      overlay.remove();
-      overlay = null;
-      document.documentElement.style.overflow = '';
-    }
-
-    function onKey(e) {
-      if (e.key === 'Escape') close();
-      if (e.key === 'ArrowRight') show(at + 1);
-      if (e.key === 'ArrowLeft') show(at - 1);
-    }
-
-    function show(i) {
-      if (group.length === 0) return;
-      at = (i + group.length) % group.length;
-      var item = group[at];
-      var stage = overlay.querySelector('.cl-lightbox__stage');
-      stage.innerHTML = '';
-
-      if (item.type === 'iframe') {
-        var frame = document.createElement('iframe');
-        frame.src = item.src;
-        frame.allow = 'autoplay; fullscreen; picture-in-picture';
-        frame.allowFullscreen = true;
-        frame.title = item.title || 'Video';
-        stage.appendChild(frame);
-      } else {
-        var img = document.createElement('img');
-        img.src = item.src;
-        img.alt = item.title || '';
-        stage.appendChild(img);
-      }
-      overlay.querySelector('.cl-lightbox__count').textContent =
-        group.length > 1 ? at + 1 + ' / ' + group.length : '';
-    }
-
-    function open(items, start) {
-      group = items;
-      overlay = document.createElement('div');
-      overlay.className = 'cl-lightbox';
-      overlay.setAttribute('role', 'dialog');
-      overlay.setAttribute('aria-modal', 'true');
-      overlay.innerHTML =
-        '<button type="button" class="cl-lightbox__close" aria-label="Close">&times;</button>' +
-        '<button type="button" class="cl-lightbox__nav cl-lightbox__nav--prev" aria-label="Previous">&#8249;</button>' +
-        '<div class="cl-lightbox__stage"></div>' +
-        '<button type="button" class="cl-lightbox__nav cl-lightbox__nav--next" aria-label="Next">&#8250;</button>' +
-        '<p class="cl-lightbox__count"></p>';
-
-      overlay.addEventListener('click', function (e) {
-        if (e.target === overlay || e.target.classList.contains('cl-lightbox__close')) close();
-        if (e.target.classList.contains('cl-lightbox__nav--next')) show(at + 1);
-        if (e.target.classList.contains('cl-lightbox__nav--prev')) show(at - 1);
-      });
-
-      document.body.appendChild(overlay);
-      document.documentElement.style.overflow = 'hidden';
-      document.addEventListener('keydown', onKey);
-      overlay.querySelector('.cl-lightbox__close').focus();
-
-      // Only offer navigation when there is more than one item.
-      if (group.length < 2) {
-        Array.prototype.forEach.call(overlay.querySelectorAll('.cl-lightbox__nav'), function (b) {
-          b.hidden = true;
-        });
-      }
-      show(start);
-    }
-
-    return { open: open, close: close };
+  function isHidden(el) {
+    return window.getComputedStyle(el).display === 'none';
   }
 
-  /* ------------------------------------------------------------------ *
-   * Helpers
-   * ------------------------------------------------------------------ */
+  function show(el) {
+    el.style.display = '';
+    if (isHidden(el)) el.style.display = 'block';
+  }
+
+  function animateTo(el, frames, ms, done) {
+    if (PREFERS_REDUCED || !ms || !el.animate) { if (done) done(); return; }
+    var anim = el.animate(frames, { duration: ms, easing: 'ease' });
+    anim.onfinish = function () { if (done) done(); };
+  }
+
+  /** slide(el, 'up' | 'down' | 'toggle', ms = 400, done) */
+  function slide(target, dir, ms, done) {
+    if (ms === undefined) ms = 400;
+    toElements(target).forEach(function (el) {
+      var hidden = isHidden(el);
+      var down = dir === 'down' || (dir === 'toggle' && hidden);
+      if (down && !hidden) return;
+      if (!down && hidden) return;
+      if (down) show(el);
+      var h = el.scrollHeight + 'px';
+      el.style.overflow = 'hidden';
+      animateTo(el, down ? [{ height: '0px' }, { height: h }] : [{ height: h }, { height: '0px' }], ms, function () {
+        el.style.overflow = '';
+        if (!down) el.style.display = 'none';
+        if (done) done.call(el);
+      });
+    });
+  }
+
+  /** fade(el, 'in' | 'out' | 'toggle', ms = 400, done) */
+  function fade(target, dir, ms, done) {
+    if (ms === undefined) ms = 400;
+    toElements(target).forEach(function (el) {
+      var hidden = isHidden(el);
+      var fadeIn = dir === 'in' || (dir === 'toggle' && hidden);
+      if (fadeIn && !hidden) return;
+      if (!fadeIn && hidden) return;
+      if (fadeIn) show(el);
+      animateTo(el, fadeIn ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }], ms, function () {
+        if (!fadeIn) el.style.display = 'none';
+        if (done) done.call(el);
+      });
+    });
+  }
+
+  /** Document offset of an element, like jQuery's .offset(). */
+  function offset(el) {
+    var r = el.getBoundingClientRect();
+    return { top: r.top + window.pageYOffset, left: r.left + window.pageXOffset };
+  }
+
+  /**
+   * POST/GET to WordPress (admin-ajax.php and friends) the way $.ajax did:
+   * data is form-encoded, the response parsed as JSON when it is JSON.
+   * Returns a Promise.
+   */
+  function request(url, opts) {
+    opts = opts || {};
+    var method = (opts.method || opts.type || 'POST').toUpperCase();
+    var body = null;
+    if (opts.data) {
+      var params = new URLSearchParams();
+      Object.keys(opts.data).forEach(function (k) { params.append(k, opts.data[k]); });
+      if (method === 'GET') url += (url.indexOf('?') < 0 ? '?' : '&') + params.toString();
+      else body = params;
+    }
+    return fetch(url, { method: method, body: body, credentials: 'same-origin' }).then(function (res) {
+      return res.text().then(function (text) {
+        try { return JSON.parse(text); } catch (e) { return text; }
+      });
+    });
+  }
 
   function debounce(fn, wait) {
     var t;
@@ -380,9 +287,9 @@
     }
   }
 
-  function each(selector, fn) {
+  function each(target, fn) {
     ready(function () {
-      Array.prototype.forEach.call(document.querySelectorAll(selector), fn);
+      toElements(target).forEach(fn);
     });
   }
 
@@ -486,9 +393,20 @@
     });
   }
 
-  window.ColorlibUI = {
-    Carousel: Carousel,
-    Lightbox: Lightbox,
+  var UI = window.ColorlibUI || {};
+  extend(UI, {
+    version: '3.0.0',
+    reducedMotion: PREFERS_REDUCED,
+    toElements: toElements,
+    each: each,
+    emit: emit,
+    extend: extend,
+    fromHTML: fromHTML,
+    scrollToY: scrollToY,
+    slide: slide,
+    fade: fade,
+    offset: offset,
+    request: request,
     enhanceSelect: enhanceSelect,
     enhanceSelects: enhanceSelects,
     counter: counter,
@@ -496,5 +414,183 @@
     ready: ready,
     videoSource: videoSource,
     debounce: debounce
+  });
+  window.ColorlibUI = UI;
+}());
+
+/* ColorlibUI module: ajaxchimp — replaces jquery.ajaxchimp. A Mailchimp embed
+ * form posts to .../subscribe/post?u=..&id=..; like the plugin, this turns it into
+ * a JSONP request to .../subscribe/post-json?u=..&id=..&c=<callback> (Mailchimp
+ * sends no CORS headers, so JSONP is still the only way to read the answer), stops
+ * the normal submit and writes the result into the form's `.info` element with the
+ * `valid` / `error` classes on it and on the email input. The JSONP call is a
+ * script tag with a one-off global callback and a timeout. */
+(function () {
+  'use strict';
+  var UI = window.ColorlibUI;
+  if (!UI) return;
+
+  var SUCCESS = 'We have sent you a confirmation email';
+  var seq = 0;
+  var cacheBust = Date.now();
+  var SHOW_PROPS = ['height', 'marginTop', 'marginBottom', 'paddingTop', 'paddingBottom',
+    'width', 'marginLeft', 'marginRight', 'paddingLeft', 'paddingRight'];
+
+  /** jQuery's form.serializeArray(), folded into an object (last value wins). */
+  function serialize(form) {
+    var data = {};
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name || el.disabled || el.matches(':disabled')) return;
+      if (!/^(?:input|select|textarea|keygen)/i.test(el.nodeName)) return;
+      if (/^(?:submit|button|image|reset|file)$/i.test(el.type)) return;
+      if (/^(?:checkbox|radio)$/i.test(el.type) && !el.checked) return;
+      if (el.nodeName === 'SELECT' && el.multiple) {
+        Array.prototype.forEach.call(el.options, function (o) { if (o.selected) data[el.name] = o.value; });
+        return;
+      }
+      if (el.nodeName === 'SELECT' && el.selectedIndex < 0) return;
+      data[el.name] = el.value.replace(/\r?\n/g, '\r\n');
+    });
+    return data;
+  }
+
+  function param(data) {
+    return Object.keys(data).map(function (k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(data[k] == null ? '' : data[k]);
+    }).join('&');
+  }
+
+  /** JSONP like jQuery's: url's `c=?` becomes the callback name; data and `_=` are appended. */
+  function jsonp(url, data, success, error) {
+    var name = 'ColorlibUIChimp_' + (++seq) + '_' + Date.now();
+    var script = document.createElement('script');
+    var called = false, timer;
+    function cleanup(answered) {
+      clearTimeout(timer);
+      // After a timeout or error a late reply may still arrive: leave it a no-op to call.
+      if (answered) { try { delete window[name]; } catch (e) { window[name] = undefined; } }
+      else window[name] = function () {};
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[name] = function (resp) { called = true; cleanup(true); success(resp); };
+    url = url.replace(/(=)\?(?=&|$)|\?\?/, '$1' + name);
+    var qs = param(data);
+    if (qs) url += (/\?/.test(url) ? '&' : '?') + qs;
+    url += (/\?/.test(url) ? '&' : '?') + '_=' + (cacheBust++);
+    script.async = true;
+    script.src = url;
+    script.onload = function () { if (!called) { cleanup(); error('parsererror'); } };
+    script.onerror = function () { cleanup(); error('error'); };
+    timer = setTimeout(function () { cleanup(); error('timeout'); }, 15000);
+    document.head.appendChild(script);
+  }
+
+  /** jQuery's show(2000): a hidden element grows and fades in; a visible one is left alone. */
+  function show(el, ms) {
+    if (getComputedStyle(el).display !== 'none') return;
+    el.style.display = '';
+    if (getComputedStyle(el).display === 'none') el.style.display = 'block';
+    if (UI.reducedMotion) return;
+    var cs = getComputedStyle(el), full = {}, start = null;
+    SHOW_PROPS.forEach(function (p) { full[p] = parseFloat(cs[p]) || 0; });
+    var opacity = parseFloat(cs.opacity);
+    el.style.overflow = 'hidden';
+    function apply(e) {
+      SHOW_PROPS.forEach(function (p) { el.style[p] = full[p] * e + 'px'; });
+      el.style.opacity = String(opacity * e);
+    }
+    apply(0);
+    requestAnimationFrame(function frame(now) {
+      if (start === null) start = now;
+      var p = Math.min((now - start) / ms, 1);
+      apply(0.5 - Math.cos(p * Math.PI) / 2);
+      if (p < 1) { requestAnimationFrame(frame); return; }
+      SHOW_PROPS.forEach(function (prop) { el.style[prop] = ''; });
+      el.style.opacity = '';
+      el.style.overflow = '';
+    });
+  }
+
+  function each(list, fn) { Array.prototype.forEach.call(list, fn); }
+  function swap(list, remove, add) {
+    each(list, function (el) { el.classList.remove(remove); el.classList.add(add); });
+  }
+
+  function translate(language, key) {
+    var t = UI.ajaxChimp.translations;
+    return language !== 'en' && t && t[language] && t[language][key] ? t[language][key] : null;
+  }
+
+  function init(form, options) {
+    var emails = form.querySelectorAll('input[type=email]');
+    var labels = form.querySelectorAll('.info');
+    var s = UI.extend({ url: form.getAttribute('action'), language: 'en' }, options);
+    if (!s.url) return null;
+    var url = s.url.replace('/post?', '/post-json?').concat('&c=?');
+
+    form.setAttribute('novalidate', 'true');
+    each(emails, function (e) { e.setAttribute('name', 'EMAIL'); });
+
+    function setLabel(html) {
+      each(labels, function (l) { l.innerHTML = html; show(l, 2000); });
+    }
+
+    function onResponse(resp) {
+      var msg;
+      if (resp.result === 'success') {
+        msg = SUCCESS;
+        swap(labels, 'error', 'valid');
+        swap(emails, 'error', 'valid');
+      } else {
+        swap(emails, 'valid', 'error');
+        swap(labels, 'valid', 'error');
+        // Mailchimp prefixes field errors with the field index: "0 - Please enter a value".
+        try {
+          var parts = resp.msg.split(' - ', 2);
+          msg = parts[1] !== undefined && parseInt(parts[0], 10).toString() === parts[0] ? parts[1] : resp.msg;
+        } catch (e) {
+          msg = resp.msg;
+        }
+      }
+      var code = UI.ajaxChimp.responses[msg];
+      if (code !== undefined) msg = translate(s.language, code) || msg;
+      setLabel(msg);
+      if (s.callback) s.callback(resp);
+      UI.emit(form, 'ajaxchimp:response', resp);
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      jsonp(url, serialize(form), onResponse, function (text) {
+        if (window.console) console.log('mailchimp ajax submit error: ' + text);
+      });
+      setLabel(translate(s.language, 'submit') || 'Submitting...');
+    });
+    return { form: form, settings: s };
+  }
+
+  /** $(form).ajaxChimp(options) → ColorlibUI.ajaxChimp(form, options). */
+  UI.ajaxChimp = function (target, options) {
+    var out = [];
+    UI.toElements(target).forEach(function (form) {
+      if (form._clAjaxChimp) { out.push(form._clAjaxChimp); return; }
+      var inst = init(form, options);
+      if (!inst) return;
+      form._clAjaxChimp = inst;
+      form.setAttribute('data-cl-ajaxchimp', '1');
+      out.push(inst);
+    });
+    return out;
   };
+  UI.ajaxChimp.responses = {
+    'We have sent you a confirmation email': 0,
+    'Please enter a valid email': 1,
+    'An email address must contain a single @': 2,
+    'The domain portion of the email address is invalid (the portion after the @: )': 3,
+    'The username portion of the email address is invalid (the portion before the @: )': 4,
+    'This email address looks fake or invalid. Please enter a real email address': 5
+  };
+  UI.ajaxChimp.translations = { en: null };
+  UI.ajaxChimp.init = function (selector, options) { return UI.ajaxChimp(selector, options); };
 }());

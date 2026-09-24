@@ -294,15 +294,13 @@ if ( !class_exists( 'Lifeleck_El_Widgets' ) ) {
             // googleapis js
             wp_register_script( 'maps-googleapis', '//maps.googleapis.com/maps/api/js?key='.esc_attr( $apiKey ) );
 
-            // ajaxchimp js
-            wp_enqueue_script( 'jquery-ajaxchimp', LIFELECK_DIR_ELEMENTOR . 'assets/js/jquery.ajaxchimp.min.js', array('jquery'), '1.0', true );
 
 
             // lifeleck map custom js
-            wp_register_script( 'lifeleck-map-custom', LIFELECK_DIR_ELEMENTOR . 'assets/js/map-custom.js', array('jquery'), '1.0', true );
+            wp_register_script( 'lifeleck-map-custom', LIFELECK_DIR_ELEMENTOR . 'assets/js/map-custom.js', array(), '1.0-s2', true );
 
             // lifeleck companion main js
-            wp_enqueue_script( 'lifeleck', LIFELECK_DIR_ELEMENTOR . 'assets/js/lifeleck-companion-main.js', array( 'jquery', 'jquery-ui-datepicker' ), '1.0', true );
+            wp_enqueue_script( 'lifeleck', LIFELECK_DIR_ELEMENTOR . 'assets/js/lifeleck-companion-main.js', array( 'lifeleck-ui-js' ), '1.0-s2', true );
 
 
             wp_localize_script( 'lifeleck', 'ajax_object',
