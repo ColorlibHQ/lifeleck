@@ -218,19 +218,19 @@
 						'version' 		=> '5.3.8-4',
 						'in_footer' 	=> true
 					),
+
 					array(
-						'handler'		=> 'instagramFeed',
-						'file' 			=> $jsPath.'jquery.instagramFeed.js',
-						'dependency' 	=> array( 'jquery' ),
-						'version' 		=> '1.0',
+						'handler'		=> 'lifeleck-ui-js',
+						'file' 			=> $jsPath.'colorlib-ui.js',
+						'dependency' 	=> array(),
+						'version' 		=> '2.1.1',
 						'in_footer' 	=> true
 					),
-
 					array(
 						'handler'		=> 'lifeleck-custom',
 						'file' 			=> $jsPath.'custom.js',
-						'dependency' 	=> array( 'jquery' ),
-						'version' 		=> $this->lifeleck_version,
+						'dependency' 	=> array( 'jquery', 'lifeleck-ui-js' ),
+						'version' 		=> $this->lifeleck_version . '-s1',
 						'in_footer' 	=> true
 					),
 

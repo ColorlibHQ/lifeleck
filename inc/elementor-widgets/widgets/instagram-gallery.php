@@ -183,7 +183,10 @@ class Lifeleck_Instagram_Gallery extends Widget_Base {
     <section class="social_connect_part">
         <div class="container-fluid">
             <div class="row">
-                <div class="col-xl-12 cp-instagram-photos" data-username="<?php echo esc_attr( $inst_id )?>" data-items="<?php echo esc_attr( $inst_item )?>">
+                <div class="col-xl-12 text-center">
+                    <?php if ( ! empty( $inst_id ) ) : ?>
+                    <a class="cp-instagram-link" href="<?php echo esc_url( 'https://www.instagram.com/' . rawurlencode( $inst_id ) . '/' ); ?>" target="_blank" rel="noopener"><i class="fa-brands fa-instagram" aria-hidden="true"></i> @<?php echo esc_html( $inst_id ); ?></a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -195,26 +198,6 @@ class Lifeleck_Instagram_Gallery extends Widget_Base {
     public function load_widget_script(){
         if( \Elementor\Plugin::$instance->editor->is_edit_mode() === true  ) {
         ?>
-        <script>
-        ( function( $ ){
-            function cp_instagram_photos() {
-                $('.cp-instagram-photos').each(function(){
-                    $.instagramFeed({
-                        'username': $(this).data('username'),
-                        'container': $(this),
-                        'display_profile': false,
-                        'display_biography': false,
-                        'items': $(this).data('items'),
-                        'margin': 0
-                    });
-                    console.log( $(this) );
-                });
-
-            }
-            cp_instagram_photos();
-
-        })(jQuery);
-        </script>
         <?php 
         }
     }
